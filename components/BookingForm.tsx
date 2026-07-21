@@ -121,21 +121,21 @@ export default function BookingForm() {
 
     setState({ kind: "submitting" });
     try {
-      const response = await fetch("/api/checkout", {
+      const response = await fetch("/api/checkout/create-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // The displayed estimate is never sent: Guest Services recomputes the
+        // The displayed estimate is never sent: the server recomputes the
         // authoritative amount from these booking inputs.
         body: JSON.stringify(values),
       });
       const data = (await response.json().catch(() => null)) as {
-        ok?: boolean;
         url?: string;
+        ref?: string;
         error?: string;
         errors?: FieldErrors;
       } | null;
 
-      if (!response.ok || !data?.ok || typeof data.url !== "string") {
+      if (!response.ok || typeof data?.url !== "string" || !data.url) {
         if (data?.errors) setErrors(data.errors);
         setState({
           kind: "error",

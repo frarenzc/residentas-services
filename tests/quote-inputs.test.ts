@@ -124,10 +124,11 @@ test("the total is formatted with the currency the API returned", () => {
 
 // --- no pricing table anywhere in this app ---
 
-test("residentas-services ships no pricing table", async () => {
+test("the pricing tables never reach the browser", async () => {
+  // Pricing now lives in this app (lib/pricing.ts) and is evaluated server-side
+  // by /api/quote and the checkout route. What still must not happen is a price
+  // table being bundled into client code, where a guest could edit it.
   const { readFile, readdir } = await import("node:fs/promises");
-  // The shipped source only. `tests/` legitimately names these identifiers in
-  // negative assertions like this one.
   const roots = ["app/", "components/", "lib/"].map((dir) => new URL(`../${dir}`, import.meta.url));
 
   async function sources(dir: URL): Promise<URL[]> {
@@ -143,16 +144,30 @@ test("residentas-services ships no pricing table", async () => {
   }
 
   let scanned = 0;
+  let pricingModules = 0;
+
   for (const root of roots) {
     for (const file of await sources(root)) {
       scanned += 1;
       const source = await readFile(file, "utf8");
-      expect(source, `${file.pathname}: pricing table name`).not.toMatch(
-        /TRANSFER_PRICES|TUKTUK_PRICES|PRICE_TABLE|computePrice/,
-      );
+      const isClient = source.includes('"use client"') || source.includes("'use client'");
+      const holdsTables = /TRANSFER_PRICES|TUKTUK_PRICES|PRICE_TABLE/.test(source);
+
+      if (holdsTables) {
+        pricingModules += 1;
+        expect(file.pathname, "price tables belong only in lib/pricing.ts").toMatch(/lib\/pricing\.ts$/);
+      }
+
+      if (isClient) {
+        // No client component may pull in the pricing module or its tables.
+        expect(source, `${file.pathname}: client bundle must not import pricing`).not.toMatch(
+          /@\/lib\/pricing|TRANSFER_PRICES|TUKTUK_PRICES|computePriceEuros/,
+        );
+      }
     }
   }
 
   // Guard against the scan silently walking nothing.
   expect(scanned).toBeGreaterThan(5);
+  expect(pricingModules, "expected exactly one pricing module").toBe(1);
 });

@@ -40,7 +40,7 @@ beforeEach(() => {
         ),
       );
     }
-    return Promise.resolve(new Response(JSON.stringify({ ok: true, url: STRIPE_URL, ref: "RES-ABC123" }), { status: 200 }));
+    return Promise.resolve(new Response(JSON.stringify({ url: STRIPE_URL, ref: "RES-ABC123" }), { status: 200 }));
   });
 });
 
@@ -59,7 +59,7 @@ function fillValidBooking() {
 }
 
 function checkoutCalls() {
-  return fetchMock.mock.calls.filter((call) => String(call[0]) === "/api/checkout");
+  return fetchMock.mock.calls.filter((call) => String(call[0]) === "/api/checkout/create-session");
 }
 
 test("the button offers payment only now that checkout is connected", () => {
@@ -101,7 +101,7 @@ test("the submit button shows a loading state and is disabled while processing",
   await waitFor(() => expect(screen.getByTestId("submit").textContent).toBe("Starting secure checkout…"));
   expect((screen.getByTestId("submit") as HTMLButtonElement).disabled).toBe(true);
 
-  release(new Response(JSON.stringify({ ok: true, url: STRIPE_URL, ref: "R" }), { status: 200 }));
+  release(new Response(JSON.stringify({ url: STRIPE_URL, ref: "R" }), { status: 200 }));
   await waitFor(() => expect(assign).toHaveBeenCalled());
 });
 
@@ -147,7 +147,7 @@ test("double submission cannot start two checkout sessions", async () => {
   await waitFor(() => expect(screen.getByTestId("submit").textContent).toBe("Starting secure checkout…"));
   expect(checkoutCalls()).toHaveLength(1);
 
-  release(new Response(JSON.stringify({ ok: true, url: STRIPE_URL, ref: "R" }), { status: 200 }));
+  release(new Response(JSON.stringify({ url: STRIPE_URL, ref: "R" }), { status: 200 }));
   await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
 });
 
@@ -155,7 +155,7 @@ test("a checkout failure shows a friendly error and preserves form data", async 
   fetchMock.mockImplementation((url: string) => {
     if (String(url).startsWith("/api/quote")) return new Promise(() => {});
     return Promise.resolve(
-      new Response(JSON.stringify({ ok: false, error: "Checkout is temporarily unavailable. Please try again in a moment." }), {
+      new Response(JSON.stringify({ error: "Checkout is temporarily unavailable. Please try again in a moment." }), {
         status: 502,
       }),
     );
@@ -181,7 +181,7 @@ test("a checkout failure shows a friendly error and preserves form data", async 
 test("the error is announced to assistive technology", async () => {
   fetchMock.mockImplementation((url: string) => {
     if (String(url).startsWith("/api/quote")) return new Promise(() => {});
-    return Promise.resolve(new Response(JSON.stringify({ ok: false, error: "Nope." }), { status: 502 }));
+    return Promise.resolve(new Response(JSON.stringify({ error: "Nope." }), { status: 502 }));
   });
 
   render(<BookingForm />);
@@ -227,7 +227,7 @@ test("checkout still proceeds when the quote is unavailable", async () => {
     if (String(url).startsWith("/api/quote")) {
       return Promise.resolve(new Response("down", { status: 502 }));
     }
-    return Promise.resolve(new Response(JSON.stringify({ ok: true, url: STRIPE_URL, ref: "R" }), { status: 200 }));
+    return Promise.resolve(new Response(JSON.stringify({ url: STRIPE_URL, ref: "R" }), { status: 200 }));
   });
 
   render(<BookingForm />);

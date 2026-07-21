@@ -1,0 +1,541 @@
+"use client";
+
+import { cloneElement, isValidElement, useRef, useState } from "react";
+
+import {
+  BAG_OPTIONS,
+  CABIN_BAG_OPTIONS,
+  CHILD_SEAT_OPTIONS,
+  DIRECTIONS,
+  DIRECTION_HINTS,
+  DIRECTION_LABELS,
+  TRANSFER_FIELD_LABELS,
+  DURATIONS,
+  DURATION_LABELS,
+  PAX_OPTIONS,
+  PROPERTIES,
+  ROUTES,
+  ROUTE_LABELS,
+  SERVICE_LABELS,
+  SERVICE_TYPES,
+  type Direction,
+  type ServiceType,
+} from "@/lib/catalog";
+import {
+  EMPTY_BOOKING,
+  isValid,
+  validateBooking,
+  type BookingInput,
+  type FieldErrors,
+} from "@/lib/bookingSchema";
+import { formatQuoteTotal, quoteInputsFor } from "@/lib/quote";
+import { PriceCallout } from "./PriceCallout";
+import { useQuote } from "./useQuote";
+
+// Public booking form, migrated from the Guest Services /book page.
+// Field names, allowed values and required/optional behaviour are preserved so
+// the payload stays compatible with the authoritative Guest Services backend.
+// No price is calculated here — Guest Services computes it server-side.
+
+type SubmitState =
+  | { kind: "idle" }
+  | { kind: "submitting" }
+  | { kind: "redirecting" }
+  | { kind: "error"; message: string };
+
+function Field({
+  id,
+  label,
+  error,
+  children,
+}: {
+  id: string;
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
+  // Every control here is identified by its booking-field key, so wire the
+  // label, id and name from this one place. Repeating them on each control
+  // let some inputs drift without a `name`.
+  const control = isValidElement<{ id?: string; name?: string }>(children)
+    ? cloneElement(children, { id, name: id })
+    : children;
+
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      {control}
+      {error ? (
+        <p className="field-error" id={`${id}-error`} role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+export default function BookingForm() {
+  const [values, setValues] = useState<BookingInput>(EMPTY_BOOKING);
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [state, setState] = useState<SubmitState>({ kind: "idle" });
+  // Guards checkout against rapid repeat clicks; see onSubmit.
+  const submitLock = useRef(false);
+
+  const service = values.service as ServiceType;
+  const direction = values.direction as Direction;
+
+  // Estimated price. Inputs are null until the selection is priceable, which is
+  // what keeps us from asking Guest Services too early. Changing service, pax,
+  // direction or duration produces new inputs and therefore a fresh quote.
+  const quoteState = useQuote(quoteInputsFor(values));
+
+  function update<K extends keyof BookingInput>(key: K, value: BookingInput[K]) {
+    setValues((current) => ({ ...current, [key]: value }));
+    setErrors((current) => ({ ...current, [key]: undefined }));
+    setState({ kind: "idle" });
+  }
+
+  function selectService(next: ServiceType) {
+    setValues((current) => ({ ...current, service: next }));
+    setErrors({});
+    setState({ kind: "idle" });
+  }
+
+  async function onSubmit(event: React.FormEvent) {
+    event.preventDefault();
+
+    // Double-submit guard. This MUST be a ref, not React state: several clicks
+    // dispatched in the same task all observe the pre-render state value, so a
+    // state-based check lets each one through and creates a Stripe session per
+    // click. The ref flips synchronously on the first call.
+    if (submitLock.current) return;
+    submitLock.current = true;
+
+    const found = validateBooking(values);
+    setErrors(found);
+    if (!isValid(found)) {
+      setState({ kind: "error", message: "Please correct the highlighted fields." });
+      submitLock.current = false;
+      return;
+    }
+
+    setState({ kind: "submitting" });
+    try {
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // The displayed estimate is never sent: Guest Services recomputes the
+        // authoritative amount from these booking inputs.
+        body: JSON.stringify(values),
+      });
+      const data = (await response.json().catch(() => null)) as {
+        ok?: boolean;
+        url?: string;
+        error?: string;
+        errors?: FieldErrors;
+      } | null;
+
+      if (!response.ok || !data?.ok || typeof data.url !== "string") {
+        if (data?.errors) setErrors(data.errors);
+        setState({
+          kind: "error",
+          message: data?.error ?? "Checkout is temporarily unavailable. Please try again in a moment.",
+        });
+        submitLock.current = false;
+        return;
+      }
+
+      // Hand off to Stripe. The lock stays engaged: the browser is leaving, and
+      // a session has already been created.
+      setState({ kind: "redirecting" });
+      window.location.assign(data.url);
+    } catch {
+      setState({ kind: "error", message: "Network error. Please check your connection and try again." });
+      submitLock.current = false;
+    }
+  }
+
+  const submitting = state.kind === "submitting" || state.kind === "redirecting";
+
+  return (
+    <form className="form-card" onSubmit={onSubmit} noValidate>
+      {/* Service selection */}
+      <fieldset className="form-section">
+        <legend className="section-label">Choose your service</legend>
+        <div className="service-toggle" role="group" aria-label="Service type">
+          {SERVICE_TYPES.map((option) => (
+            <button
+              key={option}
+              type="button"
+              className={`service-btn ${service === option ? "active" : ""}`}
+              aria-pressed={service === option}
+              onClick={() => selectService(option)}
+            >
+              {SERVICE_LABELS[option]}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      {/* Guest details */}
+      <fieldset className="form-section">
+        <legend className="section-label">Guest details</legend>
+        <div className="field-grid">
+          <Field id="firstName" label="First name" error={errors.firstName}>
+            <input
+              id="firstName"
+              name="firstName"
+              value={values.firstName}
+              onChange={(e) => update("firstName", e.target.value)}
+              aria-invalid={Boolean(errors.firstName)}
+              autoComplete="given-name"
+            />
+          </Field>
+          <Field id="lastName" label="Last name" error={errors.lastName}>
+            <input
+              id="lastName"
+              name="lastName"
+              value={values.lastName}
+              onChange={(e) => update("lastName", e.target.value)}
+              aria-invalid={Boolean(errors.lastName)}
+              autoComplete="family-name"
+            />
+          </Field>
+          <Field id="email" label="Email address" error={errors.email}>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              value={values.email}
+              onChange={(e) => update("email", e.target.value)}
+              aria-invalid={Boolean(errors.email)}
+              autoComplete="email"
+            />
+          </Field>
+          <Field id="phone" label="Phone / WhatsApp" error={errors.phone}>
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              value={values.phone}
+              onChange={(e) => update("phone", e.target.value)}
+              autoComplete="tel"
+            />
+          </Field>
+          <Field id="hotel" label="Apartment" error={errors.hotel}>
+            <select
+              id="hotel"
+              name="hotel"
+              value={values.hotel}
+              onChange={(e) => update("hotel", e.target.value)}
+              aria-invalid={Boolean(errors.hotel)}
+            >
+              <option value="">— Select your apartment —</option>
+              {PROPERTIES.map((property) => (
+                <option key={property} value={property}>
+                  {property}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field id="room" label="Room number (optional)">
+            <input id="room" name="room" value={values.room} onChange={(e) => update("room", e.target.value)} />
+          </Field>
+        </div>
+      </fieldset>
+
+      {/* Transfer-specific */}
+      {service === "transfer" ? (
+        <fieldset className="form-section" data-testid="transfer-fields">
+          <legend className="section-label">Arrival &amp; departure</legend>
+
+          {/* Direction picker. /book renders these as clickable divs, which are
+              not keyboard-reachable; the same design is kept here as a real
+              radio group so it can be tabbed and arrowed through. */}
+          <div
+            className="direction-cards"
+            role="radiogroup"
+            aria-label="Direction"
+            data-testid="direction-cards"
+          >
+            {DIRECTIONS.map((value) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={values.direction === value}
+                className={`dir-card ${values.direction === value ? "selected" : ""}`}
+                onClick={() => update("direction", value)}
+              >
+                <span className="dir-name">{DIRECTION_LABELS[value]}</span>
+                <span className="dir-hint">{DIRECTION_HINTS[value]}</span>
+              </button>
+            ))}
+          </div>
+          {errors.direction ? (
+            <p className="field-error" role="alert">
+              {errors.direction}
+            </p>
+          ) : null}
+
+          <Field id="pax" label="Number of passengers" error={errors.pax}>
+            <select
+              id="pax"
+              name="pax"
+              value={values.pax ?? ""}
+              onChange={(e) => update("pax", e.target.value ? Number(e.target.value) : null)}
+              aria-invalid={Boolean(errors.pax)}
+            >
+              <option value="">— Select passengers —</option>
+              {PAX_OPTIONS.map((count) => (
+                <option key={count} value={count}>
+                  {count} passengers
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <PriceCallout state={quoteState} />
+
+          {direction === "airport-apt" || direction === "both" ? (
+            <div className="field-grid" data-testid="arrival-fields">
+              <Field
+                id={direction === "both" ? "bthArrDate" : "arrDate"}
+                label="Arrival date"
+                error={direction === "both" ? errors.bthArrDate : errors.arrDate}
+              >
+                <input
+                  id={direction === "both" ? "bthArrDate" : "arrDate"}
+                  type="date"
+                  value={direction === "both" ? values.bthArrDate : values.arrDate}
+                  onChange={(e) => update(direction === "both" ? "bthArrDate" : "arrDate", e.target.value)}
+                />
+              </Field>
+              <Field
+                id={direction === "both" ? "bthArrFlight" : "arrFlight"}
+                label={TRANSFER_FIELD_LABELS.arrFlight[direction === "both" ? "both" : "oneWay"]}
+              >
+                <input
+                  id={direction === "both" ? "bthArrFlight" : "arrFlight"}
+                  value={direction === "both" ? values.bthArrFlight : values.arrFlight}
+                  onChange={(e) => update(direction === "both" ? "bthArrFlight" : "arrFlight", e.target.value)}
+                />
+              </Field>
+              <Field id={direction === "both" ? "bthArrTime" : "arrTime"} label="Landing time">
+                <input
+                  id={direction === "both" ? "bthArrTime" : "arrTime"}
+                  type="time"
+                  value={direction === "both" ? values.bthArrTime : values.arrTime}
+                  onChange={(e) => update(direction === "both" ? "bthArrTime" : "arrTime", e.target.value)}
+                />
+              </Field>
+              <Field
+                id={direction === "both" ? "bthArrOrigin" : "arrOrigin"}
+                label={TRANSFER_FIELD_LABELS.arrOrigin[direction === "both" ? "both" : "oneWay"]}
+              >
+                <input
+                  id={direction === "both" ? "bthArrOrigin" : "arrOrigin"}
+                  value={direction === "both" ? values.bthArrOrigin : values.arrOrigin}
+                  onChange={(e) => update(direction === "both" ? "bthArrOrigin" : "arrOrigin", e.target.value)}
+                />
+              </Field>
+            </div>
+          ) : null}
+
+          {direction === "apt-airport" || direction === "both" ? (
+            <div className="field-grid" data-testid="departure-fields">
+              <Field
+                id={direction === "both" ? "bthDepDate" : "depDate"}
+                label="Departure date"
+                error={direction === "both" ? errors.bthDepDate : errors.depDate}
+              >
+                <input
+                  id={direction === "both" ? "bthDepDate" : "depDate"}
+                  type="date"
+                  value={direction === "both" ? values.bthDepDate : values.depDate}
+                  onChange={(e) => update(direction === "both" ? "bthDepDate" : "depDate", e.target.value)}
+                />
+              </Field>
+              <Field
+                id={direction === "both" ? "bthDepFlight" : "depFlight"}
+                label={TRANSFER_FIELD_LABELS.depFlight[direction === "both" ? "both" : "oneWay"]}
+              >
+                <input
+                  id={direction === "both" ? "bthDepFlight" : "depFlight"}
+                  value={direction === "both" ? values.bthDepFlight : values.depFlight}
+                  onChange={(e) => update(direction === "both" ? "bthDepFlight" : "depFlight", e.target.value)}
+                />
+              </Field>
+              <Field id={direction === "both" ? "bthDepPickup" : "depPickup"} label="Pick-up time at apartment">
+                <input
+                  id={direction === "both" ? "bthDepPickup" : "depPickup"}
+                  type="time"
+                  value={direction === "both" ? values.bthDepPickup : values.depPickup}
+                  onChange={(e) => update(direction === "both" ? "bthDepPickup" : "depPickup", e.target.value)}
+                />
+              </Field>
+              <Field
+                id={direction === "both" ? "bthDepDest" : "depDest"}
+                label={TRANSFER_FIELD_LABELS.depDest[direction === "both" ? "both" : "oneWay"]}
+              >
+                <input
+                  id={direction === "both" ? "bthDepDest" : "depDest"}
+                  value={direction === "both" ? values.bthDepDest : values.depDest}
+                  onChange={(e) => update(direction === "both" ? "bthDepDest" : "depDest", e.target.value)}
+                />
+              </Field>
+            </div>
+          ) : null}
+
+        </fieldset>
+      ) : null}
+
+      {/* Luggage & comforts — /book groups these separately from the flight
+          details rather than running one long transfer section. */}
+      {service === "transfer" ? (
+        <fieldset className="form-section" data-testid="luggage-fields">
+          <legend className="section-label">Luggage &amp; comforts</legend>
+
+          <div className="field-grid">
+            <Field id="bagsCheckin" label="Check-in bags">
+              <select id="bagsCheckin" value={values.bagsCheckin} onChange={(e) => update("bagsCheckin", e.target.value)}>
+                {BAG_OPTIONS.map((o) => (
+                  <option key={o} value={o}>{o} bags</option>
+                ))}
+              </select>
+            </Field>
+            <Field id="bagsCabin" label="Cabin bags">
+              <select id="bagsCabin" value={values.bagsCabin} onChange={(e) => update("bagsCabin", e.target.value)}>
+                {CABIN_BAG_OPTIONS.map((o) => (
+                  <option key={o} value={o}>{o} bags</option>
+                ))}
+              </select>
+            </Field>
+            <Field id="childSeats" label="Child seats">
+              <select id="childSeats" value={values.childSeats} onChange={(e) => update("childSeats", e.target.value)}>
+                {CHILD_SEAT_OPTIONS.map((o) => (
+                  <option key={o} value={o}>{o === "0" ? "None" : `${o} seat${o === "1" ? "" : "s"}`}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          <Field id="transferNotes" label="Additional notes (optional)">
+            <input
+              id="transferNotes"
+              value={values.transferNotes}
+              onChange={(e) => update("transferNotes", e.target.value)}
+            />
+          </Field>
+        </fieldset>
+      ) : null}
+
+      {/* Tuk-tuk specific */}
+      {service === "tuktuk" ? (
+        <fieldset className="form-section" data-testid="tuktuk-fields">
+          <legend className="section-label">Tuk-tuk tour details</legend>
+
+          <Field id="route" label="Preferred route" error={errors.route}>
+            <select id="route" value={values.route ?? ""} onChange={(e) => update("route", e.target.value || null)}>
+              <option value="">— No preference —</option>
+              {ROUTES.map((value) => (
+                <option key={value} value={value}>
+                  {ROUTE_LABELS[value]}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field id="durationMins" label="Tour duration" error={errors.durationMins}>
+            <select
+              id="durationMins"
+              value={values.durationMins ?? ""}
+              onChange={(e) => update("durationMins", e.target.value ? Number(e.target.value) : null)}
+              aria-invalid={Boolean(errors.durationMins)}
+            >
+              <option value="">— Select duration —</option>
+              {DURATIONS.map((mins) => (
+                <option key={mins} value={mins}>
+                  {DURATION_LABELS[mins]}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <PriceCallout state={quoteState} />
+
+          <div className="field-grid">
+            <Field id="tuktukDate" label="Tour date" error={errors.tuktukDate}>
+              <input
+                id="tuktukDate"
+                type="date"
+                value={values.tuktukDate}
+                onChange={(e) => update("tuktukDate", e.target.value)}
+                aria-invalid={Boolean(errors.tuktukDate)}
+              />
+            </Field>
+            <Field id="tuktukTime" label="Pick-up time at apartment door">
+              <input
+                id="tuktukTime"
+                type="time"
+                value={values.tuktukTime}
+                onChange={(e) => update("tuktukTime", e.target.value)}
+              />
+            </Field>
+            <Field id="tuktukPax" label="Number of passengers">
+              <input
+                id="tuktukPax"
+                type="number"
+                min="1"
+                max="6"
+                value={values.tuktukPax}
+                onChange={(e) => update("tuktukPax", e.target.value)}
+              />
+            </Field>
+          </div>
+
+          <Field id="tuktukNotes" label="Special requests (optional)">
+            <input
+              id="tuktukNotes"
+              value={values.tuktukNotes}
+              onChange={(e) => update("tuktukNotes", e.target.value)}
+            />
+          </Field>
+        </fieldset>
+      ) : null}
+
+      {/* Submit + states */}
+      <div className="submit-wrap">
+        {/* Summary total. Only shown once a quote for the CURRENT selection has
+            arrived, so a stale figure can never sit next to the submit button. */}
+        {quoteState.status === "ready" ? (
+          <p className="summary-total" data-testid="summary-total">
+            <span className="summary-total-label">Estimated total</span>
+            <span className="summary-total-value">{formatQuoteTotal(quoteState.quote)}</span>
+          </p>
+        ) : null}
+        {quoteState.status === "loading" ? (
+          <p className="summary-total" data-testid="summary-total-updating">
+            <span className="summary-total-label">Estimated total</span>
+            <span className="summary-total-value price-callout-pending">Updating…</span>
+          </p>
+        ) : null}
+        {state.kind === "error" ? (
+          <p className="submit-error" role="alert" data-testid="form-error">
+            {state.message}
+          </p>
+        ) : null}
+        <p className="submit-note">
+          A member of our concierge team will follow up shortly to confirm every detail.
+        </p>
+        <button type="submit" className="submit-btn" disabled={submitting} data-testid="submit">
+          {state.kind === "redirecting"
+            ? "Redirecting to secure checkout…"
+            : state.kind === "submitting"
+              ? "Starting secure checkout…"
+              : "Continue to payment"}
+        </button>
+      </div>
+    </form>
+  );
+}

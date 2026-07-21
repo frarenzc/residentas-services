@@ -143,13 +143,44 @@ test("the example env file documents every variable the app reads", async () => 
   }
 });
 
-test("the migrated staff surface was NOT brought across", async () => {
+test("staff UI and staff auth were NOT brought across", async () => {
   const { access } = await import("node:fs/promises");
 
-  for (const excluded of ["../app/staff", "../app/book", "../app/api/internal", "../app/api/staff"]) {
+  // This app owns booking data and now serves the authenticated read/write API
+  // the Hub consumes (app/api/internal/**). What must never live here is the
+  // staff-facing UI or its session auth — those belong to the Hub.
+  for (const excluded of ["../app/staff", "../app/book", "../app/api/staff"]) {
     await expect(
       access(new URL(excluded, import.meta.url)),
       `${excluded} must not exist in the public app`,
     ).rejects.toThrow();
+  }
+});
+
+test("the internal API is present and bearer-protected, never public", async () => {
+  const { readFile, readdir } = await import("node:fs/promises");
+  const root = new URL("../app/api/internal/guest-services/", import.meta.url);
+
+  async function routes(dir: URL): Promise<URL[]> {
+    const entries = await readdir(dir, { withFileTypes: true });
+    const found: URL[] = [];
+    for (const entry of entries) {
+      const child = new URL(`${entry.name}${entry.isDirectory() ? "/" : ""}`, dir);
+      if (entry.isDirectory()) found.push(...(await routes(child)));
+      else if (entry.name === "route.ts") found.push(child);
+    }
+    return found;
+  }
+
+  const files = await routes(root);
+  expect(files.length, "expected the five internal routes").toBe(5);
+
+  for (const file of files) {
+    const source = await readFile(file, "utf8");
+
+    // Every internal route must authenticate; none may be a client component.
+    expect(source, `${file.pathname} must check a bearer token`).toMatch(/authorization/i);
+    expect(source, `${file.pathname} must compare in constant time`).toContain("timingSafeEqual");
+    expect(source, `${file.pathname} must not be a client component`).not.toContain("use client");
   }
 });

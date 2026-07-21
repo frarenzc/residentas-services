@@ -91,3 +91,14 @@ npm run build      # production build
 | `/api/checkout` | Starts checkout via Guest Services (POST) |
 | `/api/quote` | Same-origin proxy to the authoritative quote endpoint (GET) |
 | `/api/booking` | Validation-only boundary from the initial migration (POST). Superseded by `/api/checkout`; retained rather than deleted because this repo is not under version control. |
+
+## Environment variables
+
+Names only — never commit real values. Set them in `.env.local` (local) and in
+the deployment environment (production). See `.env.local.example` for the full
+template.
+
+| Name | Scope | Purpose |
+| --- | --- | --- |
+| `GUEST_SERVICES_BASE_URL` | Server only | Bare origin of the Guest Services app that this app calls server-side for authoritative quotes and to start checkout (e.g. `http://localhost:3000` local, `https://guest-services.residentas.com` production). Never exposed to the browser; the browser never chooses this destination. |
+| `NEXT_PUBLIC_SITE_URL` | Public | Bare origin of this public booking app, used to build the checkout return (success/cancel) origin (e.g. `http://localhost:3002` local, `https://services.residentas.com` production). |

@@ -132,7 +132,23 @@ export async function POST(request: NextRequest) {
   // origins and paths are server-controlled. `checkoutSource` is used ONLY here
   // and is deliberately not added to the booking or to Stripe metadata, since
   // the webhook spreads metadata straight into the bookings insert.
-  const { successUrl, cancelUrl } = resolveReturnUrls(body.checkoutSource, ref);
+  // Resolved BEFORE any Stripe call: if the return destination is
+  // misconfigured, refuse to start checkout rather than take a payment we
+  // cannot return the guest from.
+  let successUrl: string;
+  let cancelUrl: string;
+  try {
+    ({ successUrl, cancelUrl } = resolveReturnUrls(body.checkoutSource, ref));
+  } catch (err) {
+    console.error(
+      'Refusing to start checkout: return URLs are misconfigured.',
+      err instanceof Error ? err.message : err
+    );
+    return NextResponse.json(
+      { error: 'Payment could not be started. Please try again.' },
+      { status: 500 }
+    );
+  }
 
   let session;
   try {

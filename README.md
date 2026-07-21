@@ -100,5 +100,34 @@ template.
 
 | Name | Scope | Purpose |
 | --- | --- | --- |
-| `GUEST_SERVICES_BASE_URL` | Server only | Bare origin of the Guest Services app that this app calls server-side for authoritative quotes and to start checkout (e.g. `http://localhost:3000` local, `https://guest-services.residentas.com` production). Never exposed to the browser; the browser never chooses this destination. |
-| `NEXT_PUBLIC_SITE_URL` | Public | Bare origin of this public booking app, used to build the checkout return (success/cancel) origin (e.g. `http://localhost:3002` local, `https://services.residentas.com` production). |
+| `NEXT_PUBLIC_SITE_URL` | Public | Bare origin of this app, used to build the Stripe return URLs. **Must be a valid `https://` origin in production** — checkout refuses to start otherwise rather than stranding a paying guest at an unreachable address. Plain `http://localhost` is accepted outside production only. |
+| `STRIPE_SECRET_KEY_RMI` | Server only | Secret key for the Residentas RMI account (Arco do Bandeira bookings). |
+| `STRIPE_SECRET_KEY_ACTIVOS_REAIS` | Server only | Secret key for the Activos Reais account (all other properties). |
+| `STRIPE_WEBHOOK_SECRET_RMI` | Server only | Signing secret for `/api/stripe/webhook/rmi`. |
+| `STRIPE_WEBHOOK_SECRET_ACTIVOS_REAIS` | Server only | Signing secret for `/api/stripe/webhook/activos-reais`. |
+| `NEXT_PUBLIC_SUPABASE_URL` | Public | Supabase project URL. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server only | Service-role key used solely by the webhook to insert paid bookings. Bypasses RLS — never expose to the browser. |
+
+`GUEST_SERVICES_BASE_URL` is no longer used. Pricing, checkout, persistence and
+webhooks all run in this application.
+
+## Webhook ownership
+
+**residentas-services is the sole owner of production Stripe webhook
+deliveries.** Both accounts must register their endpoint against this app only:
+
+| Stripe account | Production endpoint |
+| --- | --- |
+| Residentas RMI | `https://services.residentas.com/api/stripe/webhook/rmi` |
+| Activos Reais | `https://services.residentas.com/api/stripe/webhook/activos-reais` |
+
+Guest Services still contains identical webhook routes and remains deployable as
+a **rollback path**, but its endpoints must **not** be registered in Stripe while
+this app owns delivery. Both apps write to the same `bookings` table, so
+registering both would have each attempt the same insert. The duplicate guard
+(matching on `ref` or `stripe_checkout_session_id`) makes that safe for data
+integrity, but it produces confusing double-processing in logs and should be
+avoided.
+
+To roll back: unregister this app's endpoints, register the Guest Services
+equivalents, and point guests at `/book`.

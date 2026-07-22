@@ -52,13 +52,27 @@ async function readNotes(reference: string) {
   return { data: data as NotesRow | null, error };
 }
 
-async function recordNoteChange(reference: string, from: string | null, to: string | null) {
+// Identity of the caller acting on behalf of a human, for the audit log.
+//
+// Callers authenticate with a shared service token, so the token alone only
+// says "Central Hub" — it cannot say which member of staff. An optional
+// `actor` in the body carries that. It is untrusted input from an already
+// authenticated service, so it is length-capped and stripped of control
+// characters before being stored; when absent or unusable the previous
+// 'central-hub' default stands.
+function auditActor(body: object): string {
+  const raw = 'actor' in body && typeof body.actor === 'string' ? body.actor : '';
+  const clean = raw.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 200);
+  return clean.length > 0 ? clean : 'central-hub';
+}
+
+async function recordNoteChange(reference: string, from: string | null, to: string | null, actor: string) {
   const { error } = await supabaseAdmin.from('booking_events').insert({
     booking_ref: reference,
     event_type: 'staff_notes_updated',
     old_value: from,
     new_value: to,
-    created_by: 'central-hub',
+    created_by: actor,
   });
 
   if (error) {
@@ -152,7 +166,12 @@ export async function PATCH(request: NextRequest) {
   }
 
   const updated = data as NotesRow;
-  await recordNoteChange(reference, current.data.staff_notes ?? null, updated.staff_notes ?? null);
+  await recordNoteChange(
+    reference,
+    current.data.staff_notes ?? null,
+    updated.staff_notes ?? null,
+    auditActor(body),
+  );
 
   return NextResponse.json({ reference: updated.ref, staffNotes: updated.staff_notes ?? null, changed: true });
 }

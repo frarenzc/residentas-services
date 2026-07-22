@@ -43,6 +43,22 @@ type SubmitState =
   | { kind: "redirecting" }
   | { kind: "error"; message: string };
 
+export function openPickerForInput(input: HTMLInputElement | null) {
+  if (!input) return;
+
+  if (typeof input.showPicker === "function") {
+    try {
+      input.showPicker();
+      return;
+    } catch {
+      // Browser refused (unsupported / not a user gesture). Focus still gives a
+      // keyboard/user-operable control without changing the selected value.
+    }
+  }
+
+  input.focus();
+}
+
 function Field({
   id,
   label,
@@ -71,6 +87,48 @@ function Field({
         </p>
       ) : null}
     </div>
+  );
+}
+
+function PickerInput({
+  id,
+  type,
+  value,
+  ariaLabel,
+  ariaInvalid,
+  onChange,
+}: {
+  id: keyof BookingInput;
+  type: "date" | "time";
+  value: string;
+  ariaLabel: string;
+  ariaInvalid?: boolean;
+  onChange: (value: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const icon = type === "date" ? "📅" : "🕘";
+
+  return (
+    <span className="picker-control">
+      <input
+        ref={inputRef}
+        id={id}
+        name={id}
+        type={type}
+        value={value}
+        onClick={(event) => openPickerForInput(event.currentTarget)}
+        onChange={(event) => onChange(event.target.value)}
+        aria-invalid={ariaInvalid}
+      />
+      <button
+        type="button"
+        className="picker-button"
+        aria-label={ariaLabel}
+        onClick={() => openPickerForInput(inputRef.current)}
+      >
+        <span aria-hidden="true">{icon}</span>
+      </button>
+    </span>
   );
 }
 
@@ -304,11 +362,13 @@ export default function BookingForm() {
                 label="Arrival date"
                 error={direction === "both" ? errors.bthArrDate : errors.arrDate}
               >
-                <input
+                <PickerInput
                   id={direction === "both" ? "bthArrDate" : "arrDate"}
                   type="date"
                   value={direction === "both" ? values.bthArrDate : values.arrDate}
-                  onChange={(e) => update(direction === "both" ? "bthArrDate" : "arrDate", e.target.value)}
+                  ariaLabel="Open arrival date picker"
+                  ariaInvalid={Boolean(direction === "both" ? errors.bthArrDate : errors.arrDate)}
+                  onChange={(value) => update(direction === "both" ? "bthArrDate" : "arrDate", value)}
                 />
               </Field>
               <Field
@@ -322,11 +382,12 @@ export default function BookingForm() {
                 />
               </Field>
               <Field id={direction === "both" ? "bthArrTime" : "arrTime"} label="Landing time">
-                <input
+                <PickerInput
                   id={direction === "both" ? "bthArrTime" : "arrTime"}
                   type="time"
                   value={direction === "both" ? values.bthArrTime : values.arrTime}
-                  onChange={(e) => update(direction === "both" ? "bthArrTime" : "arrTime", e.target.value)}
+                  ariaLabel="Open landing time picker"
+                  onChange={(value) => update(direction === "both" ? "bthArrTime" : "arrTime", value)}
                 />
               </Field>
               <Field
@@ -349,11 +410,13 @@ export default function BookingForm() {
                 label="Departure date"
                 error={direction === "both" ? errors.bthDepDate : errors.depDate}
               >
-                <input
+                <PickerInput
                   id={direction === "both" ? "bthDepDate" : "depDate"}
                   type="date"
                   value={direction === "both" ? values.bthDepDate : values.depDate}
-                  onChange={(e) => update(direction === "both" ? "bthDepDate" : "depDate", e.target.value)}
+                  ariaLabel="Open departure date picker"
+                  ariaInvalid={Boolean(direction === "both" ? errors.bthDepDate : errors.depDate)}
+                  onChange={(value) => update(direction === "both" ? "bthDepDate" : "depDate", value)}
                 />
               </Field>
               <Field
@@ -367,11 +430,12 @@ export default function BookingForm() {
                 />
               </Field>
               <Field id={direction === "both" ? "bthDepPickup" : "depPickup"} label="Pick-up time at apartment">
-                <input
+                <PickerInput
                   id={direction === "both" ? "bthDepPickup" : "depPickup"}
                   type="time"
                   value={direction === "both" ? values.bthDepPickup : values.depPickup}
-                  onChange={(e) => update(direction === "both" ? "bthDepPickup" : "depPickup", e.target.value)}
+                  ariaLabel="Open departure pick-up time picker"
+                  onChange={(value) => update(direction === "both" ? "bthDepPickup" : "depPickup", value)}
                 />
               </Field>
               <Field
@@ -466,20 +530,22 @@ export default function BookingForm() {
 
           <div className="field-grid">
             <Field id="tuktukDate" label="Tour date" error={errors.tuktukDate}>
-              <input
+              <PickerInput
                 id="tuktukDate"
                 type="date"
                 value={values.tuktukDate}
-                onChange={(e) => update("tuktukDate", e.target.value)}
-                aria-invalid={Boolean(errors.tuktukDate)}
+                ariaLabel="Open tuk-tuk tour date picker"
+                ariaInvalid={Boolean(errors.tuktukDate)}
+                onChange={(value) => update("tuktukDate", value)}
               />
             </Field>
             <Field id="tuktukTime" label="Pick-up time at apartment door">
-              <input
+              <PickerInput
                 id="tuktukTime"
                 type="time"
                 value={values.tuktukTime}
-                onChange={(e) => update("tuktukTime", e.target.value)}
+                ariaLabel="Open tuk-tuk pick-up time picker"
+                onChange={(value) => update("tuktukTime", value)}
               />
             </Field>
             <Field id="tuktukPax" label="Number of passengers">

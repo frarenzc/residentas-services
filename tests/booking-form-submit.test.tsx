@@ -55,7 +55,9 @@ function fillValidBooking() {
   fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Lopes" } });
   fireEvent.change(screen.getByLabelText("Email address"), { target: { value: "ana@example.com" } });
   fireEvent.change(screen.getByLabelText("Apartment"), { target: { value: PROPERTIES[0] } });
-  fireEvent.change(screen.getByLabelText("Number of passengers"), { target: { value: "2" } });
+  const twoPax = screen.getByText("2 PAX").closest("button");
+  if (!twoPax) throw new Error("2 PAX card was not rendered.");
+  fireEvent.click(twoPax);
 }
 
 function checkoutCalls() {

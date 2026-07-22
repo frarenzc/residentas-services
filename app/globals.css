@@ -4,14 +4,18 @@
   --canvas: #fbf9f5;
   --sand: #f5efe5;
   --sand-dark: #eae1d2;
-  --terracotta: #c96a38;
-  --terracotta-dark: #ab5122;
+  --terracotta: #be6a44;
+  --terracotta-dark: #a2552f;
   --terracotta-wash: #fbf2ea;
   --olive: #74784a;
+  --olive-dark: #5f6339;
+  --olive-wash: #eef0e4;
   --ink: #231a15;
-  --ink-soft: #3d3029;
-  --muted: #6d5f55;
+  --ink-soft: #4a4335;
+  --muted: #8c8577;
+  --muted-light: #c8bfaf;
   --border: rgba(32, 27, 20, 0.1);
+  --border-strong: rgba(32, 27, 20, 0.17);
   --danger: #b3261e;
   --danger-wash: #fdeceb;
   --radius: 14px;
@@ -33,11 +37,13 @@ html {
 }
 
 body {
-  background: var(--canvas);
+  background: var(--page);
   color: var(--ink);
-  font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-  line-height: 1.5;
+  font-family: var(--font-inter), Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13.5px;
+  line-height: 1.6;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
@@ -48,9 +54,32 @@ textarea {
   color: inherit;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.icn {
+  width: 18px;
+  height: 18px;
+  display: block;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 /* ---------- Public booking layout ---------- */
 .page-wrap {
-  max-width: 860px;
+  max-width: 960px;
   margin: 0 auto;
   padding: 2rem 1.1rem 4rem;
 }
@@ -100,16 +129,23 @@ textarea {
   font-weight: 600;
 }
 .hero-title {
-  font-size: clamp(28px, 5vw, 44px);
+  font-family: var(--font-cormorant), "Cormorant Garamond", Georgia, serif;
+  font-size: clamp(32px, 5vw, 50px);
   line-height: 1.1;
   color: var(--ink);
   margin-top: 0.6rem;
-  font-weight: 600;
+  font-weight: 500;
 }
 .hero-sub {
+  font-family: var(--font-cormorant), "Cormorant Garamond", Georgia, serif;
+  font-style: italic;
   margin-top: 0.6rem;
-  color: var(--ink-soft);
+  color: var(--muted);
   font-size: 16px;
+}
+
+.booking-form {
+  width: 100%;
 }
 
 .form-card {
@@ -118,59 +154,86 @@ textarea {
   border-radius: var(--radius);
   box-shadow: var(--shadow-soft);
   overflow: hidden;
+  max-width: 860px;
+  margin: 0 auto;
 }
 
 .form-section {
   border: 0;
   border-bottom: 1px solid var(--border);
-  padding: 1.4rem 1.5rem;
+  padding: 1.65rem 1.85rem;
 }
 .form-section:last-of-type {
   border-bottom: none;
 }
 
 .section-label {
-  font-size: 11px;
+  font-size: 10px;
   letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--terracotta-dark);
   font-weight: 600;
-  margin-bottom: 1rem;
+  margin-bottom: 1.15rem;
   padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-label .icn {
+  width: 15px;
+  height: 15px;
 }
 
+.service-toggle-wrap {
+  border: 0;
+  padding: 2.25rem 1rem 2rem;
+  display: flex;
+  justify-content: center;
+}
 .service-toggle {
   display: flex;
-  gap: 0.6rem;
-  flex-wrap: wrap;
+  gap: 0;
+  flex-wrap: nowrap;
+  background: var(--page);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px;
+  box-shadow: var(--shadow-soft);
 }
 .service-btn {
-  flex: 1 1 12rem;
-  min-height: 48px;
-  padding: 0.75rem 1.1rem;
+  min-height: 42px;
+  padding: 0.72rem 1.85rem;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--canvas);
+  border: 0;
+  background: transparent;
   color: var(--ink-soft);
   font-weight: 600;
-  font-size: 14px;
+  font-size: 12px;
+  letter-spacing: 0.03em;
   cursor: pointer;
-  transition: background 0.18s, color 0.18s, border-color 0.18s;
+  transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  white-space: nowrap;
 }
 .service-btn:hover {
-  border-color: var(--terracotta);
   color: var(--terracotta-dark);
 }
 .service-btn.active {
   background: var(--terracotta);
-  border-color: var(--terracotta);
   color: #fff;
+  box-shadow: 0 8px 18px rgba(190, 106, 68, 0.2);
 }
 
 .field-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
+}
+.field-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
 }
 .field {
   display: flex;
@@ -196,48 +259,24 @@ textarea {
   background: var(--canvas);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  min-height: 48px;
-  padding: 0.7rem 0.9rem;
-  font-size: 15px;
+  min-height: 44px;
+  padding: 0.68rem 0.85rem;
+  font-size: 13px;
   color: var(--ink);
   outline: none;
   width: 100%;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
+.field select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238C8577'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 2rem;
+}
 .picker-control {
-  position: relative;
   display: block;
   width: 100%;
-}
-.field .picker-control input {
-  padding-right: 3rem;
-}
-.picker-button {
-  position: absolute;
-  top: 50%;
-  right: 6px;
-  transform: translateY(-50%);
-  width: 40px;
-  height: 40px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--muted);
-  display: inline-grid;
-  place-items: center;
-  cursor: pointer;
-  transition: color 0.2s, background 0.2s;
-}
-.picker-button:hover {
-  color: var(--terracotta-dark);
-  background: var(--terracotta-wash);
-}
-.picker-button:focus-visible {
-  outline: 2px solid var(--terracotta);
-  outline-offset: 2px;
-}
-.picker-button span {
-  pointer-events: none;
 }
 .field input:focus,
 .field select:focus {
@@ -255,25 +294,31 @@ textarea {
 }
 
 .submit-wrap {
-  padding: 1.4rem 1.5rem;
+  padding: 1.65rem 1.85rem;
   display: grid;
-  gap: 0.9rem;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 1rem;
   background: var(--canvas);
+  border-top: 1px solid var(--border);
 }
 .submit-btn {
-  min-height: 52px;
+  min-height: 48px;
   border: none;
   border-radius: var(--radius-sm);
   background: var(--terracotta);
   color: #fff;
   font-weight: 600;
-  font-size: 15px;
-  letter-spacing: 0.02em;
+  font-size: 12px;
+  letter-spacing: 0.04em;
   cursor: pointer;
-  transition: background 0.2s, opacity 0.2s;
+  padding: 0.9rem 2.25rem;
+  transition: background 0.2s, opacity 0.2s, transform 0.2s;
+  white-space: nowrap;
 }
 .submit-btn:hover:not(:disabled) {
   background: var(--terracotta-dark);
+  transform: translateY(-1px);
 }
 .submit-btn:disabled {
   opacity: 0.6;
@@ -297,9 +342,11 @@ textarea {
 }
 .submit-note {
   color: var(--muted);
+  font-family: var(--font-cormorant), "Cormorant Garamond", Georgia, serif;
+  font-style: italic;
   font-size: 13.5px;
-  line-height: 1.5;
-  margin-bottom: 0.9rem;
+  line-height: 1.4;
+  max-width: 360px;
 }
 
 /* ---------- Success / cancel ---------- */
@@ -395,7 +442,8 @@ textarea {
   width: 100%;
 }
 .dir-card:hover {
-  border-color: var(--sand-dark);
+  border-color: var(--muted-light);
+  color: var(--ink-soft);
 }
 .dir-card.selected {
   border-color: var(--terracotta);
@@ -415,10 +463,175 @@ textarea {
   color: var(--ink);
 }
 .dir-card .dir-hint {
-  font-size: 12px;
-  color: var(--ink-soft);
+  font-size: 10.5px;
+  color: var(--muted);
   display: block;
   line-height: 1.4;
+}
+.dir-icon {
+  color: var(--ink-soft);
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+.dir-card.selected .dir-icon {
+  color: var(--terracotta-dark);
+}
+.dir-icon .icn {
+  width: 20px;
+  height: 20px;
+}
+
+.transfer-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1.35rem;
+  padding-top: 1.35rem;
+  border-top: 1px solid var(--border);
+}
+.summary-card {
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  min-height: 74px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+.summary-card-icon,
+.passenger-icon,
+.pax-card-icon,
+.good-to-know-icon {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: var(--sand);
+  color: var(--terracotta-dark);
+  display: grid;
+  place-items: center;
+}
+.pax-card-icon {
+  width: 34px;
+  height: 34px;
+}
+.summary-card-icon .icn,
+.passenger-icon .icn,
+.pax-card-icon .icn,
+.good-to-know-icon .icn {
+  width: 17px;
+  height: 17px;
+}
+.summary-card-label {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+.summary-card strong {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.passenger-section {
+  margin-top: 1.35rem;
+  padding-top: 1.35rem;
+  border-top: 1px solid var(--border);
+}
+.passenger-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: 1.1rem;
+}
+.passenger-heading h2 {
+  font-size: 20px;
+  line-height: 1.15;
+  font-weight: 700;
+  color: var(--ink);
+}
+.passenger-heading p {
+  color: var(--muted);
+  margin-top: 0.25rem;
+  font-size: 13px;
+}
+.pax-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.85rem;
+}
+.pax-card {
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1rem 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
+  background: var(--canvas);
+  text-align: left;
+  color: var(--ink);
+}
+.pax-card:hover {
+  border-color: var(--muted-light);
+}
+.pax-card.selected {
+  border-color: var(--terracotta);
+  background: var(--page);
+  box-shadow: 0 8px 18px rgba(190, 106, 68, 0.08);
+}
+.pax-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+.pax-prices {
+  display: grid;
+  gap: 0.55rem;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.pax-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.pax-val {
+  color: var(--ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pax-val.active-price {
+  color: var(--terracotta-dark);
+  font-weight: 800;
+}
+.good-to-know {
+  margin-top: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--page);
+  padding: 0.95rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+.good-to-know strong {
+  display: block;
+  color: var(--ink);
+  font-size: 13px;
+  margin-bottom: 2px;
 }
 
 /* ---------- Estimated price ---------- */
@@ -446,10 +659,11 @@ textarea {
   font-weight: 600;
 }
 .price-callout-value {
-  font-size: 28px;
-  font-weight: 600;
+  font-family: var(--font-cormorant), "Cormorant Garamond", Georgia, serif;
+  font-size: 30px;
+  font-weight: 500;
   color: var(--terracotta-dark);
-  line-height: 1.1;
+  line-height: 1;
   margin-top: 4px;
 }
 .price-callout-pending {
@@ -462,7 +676,9 @@ textarea {
   color: var(--ink-soft);
 }
 .price-callout-note {
-  font-size: 13px;
+  font-family: var(--font-cormorant), "Cormorant Garamond", Georgia, serif;
+  font-style: italic;
+  font-size: 12px;
   color: var(--muted);
   max-width: 20rem;
   text-align: right;
@@ -499,11 +715,23 @@ textarea {
   .submit-wrap {
     padding: 1.15rem 1rem;
   }
-  .field-grid {
+  .field-grid,
+  .field-grid-3 {
     grid-template-columns: 1fr;
   }
   .service-btn {
-    flex: 1 1 100%;
+    padding: 0.68rem 1rem;
+  }
+  .service-toggle {
+    width: 100%;
+    max-width: 360px;
+  }
+  .service-btn {
+    flex: 1;
+  }
+  .transfer-summary-grid,
+  .pax-grid {
+    grid-template-columns: 1fr;
   }
   /* Direction cards stack on narrow screens (matches /book). */
   .direction-cards {
@@ -519,6 +747,13 @@ textarea {
   .price-callout-note {
     max-width: none;
     text-align: left;
+  }
+  .submit-wrap {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+  .submit-note {
+    max-width: none;
   }
   .status-card {
     padding: 1.6rem;

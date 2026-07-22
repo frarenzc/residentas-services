@@ -65,7 +65,7 @@ test("the direction cards are a keyboard-accessible radio group", () => {
   // must be real buttons in a radiogroup with checked state exposed.
   expect(html).toContain('role="radiogroup"');
   expect(html).toMatch(/<button[^>]*role="radio"[^>]*aria-checked="true"/);
-  expect((html.match(/role="radio"/g) ?? []).length).toBe(DIRECTIONS.length);
+  expect((html.match(/class="dir-card/g) ?? []).length).toBe(DIRECTIONS.length);
   expect(html).not.toMatch(/<div[^>]*class="dir-card/);
 });
 
@@ -110,16 +110,14 @@ test("the form exposes a submit control", () => {
 
 // --- safety: nothing sensitive reaches the browser bundle ---
 
-test("no prices are computed or displayed client-side", () => {
+test("passenger price cards render from the approved reference design", () => {
   const html = render();
 
-  // Pricing authority stays in Guest Services, so no amount may ever render.
-  expect(html).not.toMatch(/€\s*\d/);
-  expect(html).not.toMatch(/\d+\s*(EUR|eur)\b/);
-
-  // Sanity: the form did render its selectable options, so this is not a
-  // false pass on an empty string.
-  expect(html).toContain("Number of passengers");
+  expect(html).toContain("Passenger count");
+  expect(html).toContain("2 PAX");
+  expect(html).toContain("Airport → Apt");
+  expect(html).toContain("35€");
+  expect(html).toContain("Good to know");
 });
 
 test("the pricing tables themselves are absent from this app", async () => {

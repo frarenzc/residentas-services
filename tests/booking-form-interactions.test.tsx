@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
@@ -45,24 +44,14 @@ async function checkout(payload: Record<string, unknown>) {
   return POST(request as never);
 }
 
-test("default booking form renders accessible date and time picker buttons", () => {
+test("default booking form uses native date and time inputs without duplicate custom picker icons", () => {
   const html = renderToStaticMarkup(createElement(BookingForm));
 
-  expect((html.match(/class="picker-button"/g) ?? [])).toHaveLength(2);
-  expect(html).toContain('aria-label="Open arrival date picker"');
-  expect(html).toContain('aria-label="Open landing time picker"');
-});
-
-test("picker icon buttons open the associated native input", () => {
-  render(<BookingForm />);
-
-  const input = screen.getByLabelText("Arrival date") as HTMLInputElement;
-  const showPicker = vi.fn();
-  input.showPicker = showPicker;
-
-  fireEvent.click(screen.getByRole("button", { name: "Open arrival date picker" }));
-
-  expect(showPicker).toHaveBeenCalledTimes(1);
+  expect(html).toContain('type="date"');
+  expect(html).toContain('type="time"');
+  expect(html).not.toContain("picker-button");
+  expect(html).not.toContain("📅");
+  expect(html).not.toContain("🕘");
 });
 
 test("picker helper falls back to focus when native picker is unavailable", () => {

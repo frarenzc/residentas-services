@@ -21,6 +21,7 @@ import {
   type Direction,
   type ServiceType,
 } from "@/lib/catalog";
+import { computePriceEuros } from "@/lib/pricing";
 import {
   EMPTY_BOOKING,
   isValid,
@@ -94,24 +95,18 @@ function PickerInput({
   id,
   type,
   value,
-  ariaLabel,
   ariaInvalid,
   onChange,
 }: {
   id: keyof BookingInput;
   type: "date" | "time";
   value: string;
-  ariaLabel: string;
   ariaInvalid?: boolean;
   onChange: (value: string) => void;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const icon = type === "date" ? "📅" : "🕘";
-
   return (
     <span className="picker-control">
       <input
-        ref={inputRef}
         id={id}
         name={id}
         type={type}
@@ -120,16 +115,107 @@ function PickerInput({
         onChange={(event) => onChange(event.target.value)}
         aria-invalid={ariaInvalid}
       />
-      <button
-        type="button"
-        className="picker-button"
-        aria-label={ariaLabel}
-        onClick={() => openPickerForInput(inputRef.current)}
-      >
-        <span aria-hidden="true">{icon}</span>
-      </button>
     </span>
   );
+}
+
+function Icon({ name }: { name: "car" | "tuktuk" | "plane" | "home" | "arrows" | "people" | "luggage" | "calendar" | "clock" | "pin" }) {
+  const paths: Record<typeof name, React.ReactNode> = {
+    car: (
+      <>
+        <path d="M4 16l1.5-5.5A2 2 0 0 1 7.4 9h9.2a2 2 0 0 1 1.9 1.5L20 16" />
+        <rect x="3" y="16" width="18" height="4" rx="1.5" />
+        <circle cx="7.5" cy="20" r="1.3" />
+        <circle cx="16.5" cy="20" r="1.3" />
+      </>
+    ),
+    tuktuk: (
+      <>
+        <path d="M5 17V9a3 3 0 0 1 3-3h4l4 5h2a2 2 0 0 1 2 2v4" />
+        <path d="M5 17h14" />
+        <circle cx="7.5" cy="19.3" r="1.5" />
+        <circle cx="17.5" cy="19.3" r="1.5" />
+      </>
+    ),
+    plane: (
+      <>
+        <path d="M22 2 11 13" />
+        <path d="m22 2-7 20-4-9-9-4Z" />
+      </>
+    ),
+    home: (
+      <>
+        <path d="m4 11 8-7 8 7" />
+        <path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9" />
+      </>
+    ),
+    arrows: (
+      <>
+        <path d="M7 16V6M4 9l3-3 3 3" />
+        <path d="M17 8v10M14 15l3 3 3-3" />
+      </>
+    ),
+    people: (
+      <>
+        <circle cx="9" cy="8" r="3" />
+        <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+        <circle cx="17" cy="9" r="2.3" />
+        <path d="M15.5 14a5 5 0 0 1 5.5 5" />
+      </>
+    ),
+    luggage: (
+      <>
+        <rect x="4" y="8" width="16" height="12" rx="2" />
+        <path d="M9 8V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v3" />
+        <path d="M4 13h16" />
+      </>
+    ),
+    calendar: (
+      <>
+        <rect x="3" y="5" width="18" height="16" rx="3" />
+        <path d="M3 10h18M8 3v4M16 3v4" />
+      </>
+    ),
+    clock: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </>
+    ),
+    pin: (
+      <>
+        <path d="M12 22s7-7.5 7-12a7 7 0 0 0-14 0c0 4.5 7 12 7 12Z" />
+        <circle cx="12" cy="10" r="2.3" />
+      </>
+    ),
+  };
+
+  return (
+    <svg className="icn" viewBox="0 0 24 24" aria-hidden="true">
+      {paths[name]}
+    </svg>
+  );
+}
+
+function SectionTitle({ icon, children }: { icon: React.ComponentProps<typeof Icon>["name"]; children: React.ReactNode }) {
+  return (
+    <legend className="section-label">
+      <Icon name={icon} />
+      {children}
+    </legend>
+  );
+}
+
+function directionIcon(direction: Direction): React.ComponentProps<typeof Icon>["name"] {
+  if (direction === "airport-apt") return "plane";
+  if (direction === "apt-airport") return "home";
+  return "arrows";
+}
+
+function directionShort(direction: Direction) {
+  if (direction === "airport-apt") return "Airport → Apt";
+  if (direction === "apt-airport") return "Apt → Airport";
+  return "Both ways";
 }
 
 export default function BookingForm() {
@@ -214,12 +300,16 @@ export default function BookingForm() {
   }
 
   const submitting = state.kind === "submitting" || state.kind === "redirecting";
+  const transferDate =
+    direction === "apt-airport" ? values.depDate : direction === "both" ? values.bthArrDate : values.arrDate;
+  const transferTime =
+    direction === "apt-airport" ? values.depPickup : direction === "both" ? values.bthArrTime : values.arrTime;
 
   return (
-    <form className="form-card" onSubmit={onSubmit} noValidate>
+    <form className="booking-form" onSubmit={onSubmit} noValidate>
       {/* Service selection */}
-      <fieldset className="form-section">
-        <legend className="section-label">Choose your service</legend>
+      <fieldset className="service-toggle-wrap">
+        <legend className="sr-only">Choose your service</legend>
         <div className="service-toggle" role="group" aria-label="Service type">
           {SERVICE_TYPES.map((option) => (
             <button
@@ -229,15 +319,17 @@ export default function BookingForm() {
               aria-pressed={service === option}
               onClick={() => selectService(option)}
             >
+              <Icon name={option === "transfer" ? "car" : "tuktuk"} />
               {SERVICE_LABELS[option]}
             </button>
           ))}
         </div>
       </fieldset>
 
+      <div className="form-card">
       {/* Guest details */}
       <fieldset className="form-section">
-        <legend className="section-label">Guest details</legend>
+        <SectionTitle icon="people">Guest details</SectionTitle>
         <div className="field-grid">
           <Field id="firstName" label="First name" error={errors.firstName}>
             <input
@@ -305,7 +397,7 @@ export default function BookingForm() {
       {/* Transfer-specific */}
       {service === "transfer" ? (
         <fieldset className="form-section" data-testid="transfer-fields">
-          <legend className="section-label">Arrival &amp; departure</legend>
+          <SectionTitle icon="plane">Arrival &amp; departure</SectionTitle>
 
           {/* Direction picker. /book renders these as clickable divs, which are
               not keyboard-reachable; the same design is kept here as a real
@@ -325,6 +417,9 @@ export default function BookingForm() {
                 className={`dir-card ${values.direction === value ? "selected" : ""}`}
                 onClick={() => update("direction", value)}
               >
+                <span className="dir-icon">
+                  <Icon name={directionIcon(value)} />
+                </span>
                 <span className="dir-name">{DIRECTION_LABELS[value]}</span>
                 <span className="dir-hint">{DIRECTION_HINTS[value]}</span>
               </button>
@@ -335,25 +430,6 @@ export default function BookingForm() {
               {errors.direction}
             </p>
           ) : null}
-
-          <Field id="pax" label="Number of passengers" error={errors.pax}>
-            <select
-              id="pax"
-              name="pax"
-              value={values.pax ?? ""}
-              onChange={(e) => update("pax", e.target.value ? Number(e.target.value) : null)}
-              aria-invalid={Boolean(errors.pax)}
-            >
-              <option value="">— Select passengers —</option>
-              {PAX_OPTIONS.map((count) => (
-                <option key={count} value={count}>
-                  {count} passengers
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <PriceCallout state={quoteState} />
 
           {direction === "airport-apt" || direction === "both" ? (
             <div className="field-grid" data-testid="arrival-fields">
@@ -366,7 +442,6 @@ export default function BookingForm() {
                   id={direction === "both" ? "bthArrDate" : "arrDate"}
                   type="date"
                   value={direction === "both" ? values.bthArrDate : values.arrDate}
-                  ariaLabel="Open arrival date picker"
                   ariaInvalid={Boolean(direction === "both" ? errors.bthArrDate : errors.arrDate)}
                   onChange={(value) => update(direction === "both" ? "bthArrDate" : "arrDate", value)}
                 />
@@ -386,7 +461,6 @@ export default function BookingForm() {
                   id={direction === "both" ? "bthArrTime" : "arrTime"}
                   type="time"
                   value={direction === "both" ? values.bthArrTime : values.arrTime}
-                  ariaLabel="Open landing time picker"
                   onChange={(value) => update(direction === "both" ? "bthArrTime" : "arrTime", value)}
                 />
               </Field>
@@ -414,7 +488,6 @@ export default function BookingForm() {
                   id={direction === "both" ? "bthDepDate" : "depDate"}
                   type="date"
                   value={direction === "both" ? values.bthDepDate : values.depDate}
-                  ariaLabel="Open departure date picker"
                   ariaInvalid={Boolean(direction === "both" ? errors.bthDepDate : errors.depDate)}
                   onChange={(value) => update(direction === "both" ? "bthDepDate" : "depDate", value)}
                 />
@@ -434,7 +507,6 @@ export default function BookingForm() {
                   id={direction === "both" ? "bthDepPickup" : "depPickup"}
                   type="time"
                   value={direction === "both" ? values.bthDepPickup : values.depPickup}
-                  ariaLabel="Open departure pick-up time picker"
                   onChange={(value) => update(direction === "both" ? "bthDepPickup" : "depPickup", value)}
                 />
               </Field>
@@ -451,6 +523,86 @@ export default function BookingForm() {
             </div>
           ) : null}
 
+          <div className="transfer-summary-grid">
+            <div className="summary-card">
+              <span className="summary-card-icon">
+                <Icon name="calendar" />
+              </span>
+              <span>
+                <span className="summary-card-label">Date &amp; time</span>
+                <strong>{transferDate || "—"} {transferTime || "--:--"}</strong>
+              </span>
+            </div>
+            <div className="summary-card">
+              <span className="summary-card-icon">
+                <Icon name="pin" />
+              </span>
+              <span>
+                <span className="summary-card-label">Pickup / drop-off</span>
+                <strong>{directionShort(direction)}</strong>
+              </span>
+            </div>
+          </div>
+
+          <section className="passenger-section" aria-labelledby="passenger-count-title">
+            <div className="passenger-heading">
+              <span className="passenger-icon">
+                <Icon name="people" />
+              </span>
+              <div>
+                <h2 id="passenger-count-title">Passenger count</h2>
+                <p>Select the number of passengers to see your price options.</p>
+              </div>
+            </div>
+            <input id="pax" name="pax" type="hidden" value={values.pax ?? ""} />
+            <div className="pax-grid" role="radiogroup" aria-label="Number of passengers">
+              {PAX_OPTIONS.map((count) => (
+                <button
+                  key={count}
+                  type="button"
+                  role="radio"
+                  aria-checked={values.pax === count}
+                  className={`pax-card ${values.pax === count ? "selected" : ""}`}
+                  onClick={() => update("pax", count)}
+                >
+                  <span className="pax-card-title">
+                    <span className="pax-card-icon">
+                      <Icon name="people" />
+                    </span>
+                    {count} PAX
+                  </span>
+                  <span className="pax-prices">
+                    {DIRECTIONS.map((option) => {
+                      const price = computePriceEuros({ service: "transfer", pax: count, direction: option });
+                      const isActive = values.pax === count && direction === option;
+                      return (
+                        <span className="pax-row" key={option}>
+                          <span>{directionShort(option)}</span>
+                          <span className={`pax-val ${isActive ? "active-price" : ""}`}>{price}€</span>
+                        </span>
+                      );
+                    })}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {errors.pax ? (
+              <p className="field-error" role="alert">
+                {errors.pax}
+              </p>
+            ) : null}
+            <PriceCallout state={quoteState} />
+            <div className="good-to-know">
+              <span className="good-to-know-icon">
+                <Icon name="plane" />
+              </span>
+              <span>
+                <strong>Good to know</strong>
+                Prices are fixed per vehicle. All trips include tolls, taxes and up to 60 minutes of waiting time.
+              </span>
+            </div>
+          </section>
+
         </fieldset>
       ) : null}
 
@@ -458,9 +610,9 @@ export default function BookingForm() {
           details rather than running one long transfer section. */}
       {service === "transfer" ? (
         <fieldset className="form-section" data-testid="luggage-fields">
-          <legend className="section-label">Luggage &amp; comforts</legend>
+          <SectionTitle icon="luggage">Luggage &amp; comforts</SectionTitle>
 
-          <div className="field-grid">
+          <div className="field-grid field-grid-3">
             <Field id="bagsCheckin" label="Check-in bags">
               <select id="bagsCheckin" value={values.bagsCheckin} onChange={(e) => update("bagsCheckin", e.target.value)}>
                 {BAG_OPTIONS.map((o) => (
@@ -497,7 +649,7 @@ export default function BookingForm() {
       {/* Tuk-tuk specific */}
       {service === "tuktuk" ? (
         <fieldset className="form-section" data-testid="tuktuk-fields">
-          <legend className="section-label">Tuk-tuk tour details</legend>
+          <SectionTitle icon="tuktuk">Tuk-tuk tour details</SectionTitle>
 
           <Field id="route" label="Preferred route" error={errors.route}>
             <select id="route" value={values.route ?? ""} onChange={(e) => update("route", e.target.value || null)}>
@@ -534,7 +686,6 @@ export default function BookingForm() {
                 id="tuktukDate"
                 type="date"
                 value={values.tuktukDate}
-                ariaLabel="Open tuk-tuk tour date picker"
                 ariaInvalid={Boolean(errors.tuktukDate)}
                 onChange={(value) => update("tuktukDate", value)}
               />
@@ -544,7 +695,6 @@ export default function BookingForm() {
                 id="tuktukTime"
                 type="time"
                 value={values.tuktukTime}
-                ariaLabel="Open tuk-tuk pick-up time picker"
                 onChange={(value) => update("tuktukTime", value)}
               />
             </Field>
@@ -601,6 +751,7 @@ export default function BookingForm() {
               ? "Starting secure checkout…"
               : "Continue to payment"}
         </button>
+      </div>
       </div>
     </form>
   );

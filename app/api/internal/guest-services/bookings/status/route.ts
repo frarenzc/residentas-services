@@ -6,7 +6,9 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 export const runtime = 'nodejs';
 
 const ALLOWED_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled'] as const;
-const ALLOWED_BODY_KEYS = new Set(['reference', 'status']);
+// 'actor' is metadata for the audit log, not a booking field: it is
+// allowed in, but never written to the bookings row.
+const ALLOWED_BODY_KEYS = new Set(['reference', 'status', 'actor']);
 const BOOKING_FIELDS =
   'ref,guest,type,hotel,submittedAt,status,arrival,price,direction,arrivalTime,pickupTime,payment_status';
 

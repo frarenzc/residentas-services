@@ -6,7 +6,9 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 export const runtime = 'nodejs';
 
 const MAX_NOTES_LENGTH = 2000;
-const ALLOWED_BODY_KEYS = new Set(['reference', 'staffNotes']);
+// 'actor' is metadata for the audit log, not a booking field: it is
+// allowed in, but never written to the bookings row.
+const ALLOWED_BODY_KEYS = new Set(['reference', 'staffNotes', 'actor']);
 
 type NotesRow = {
   ref: string;
